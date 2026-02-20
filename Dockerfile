@@ -1,17 +1,16 @@
-# ใช้ Python Image แบบเบา
 FROM python:3.9-slim
 
-# ตั้งค่า Working Directory
 WORKDIR /app
 
-# Copy ไฟล์ที่จำเป็น
+# 1. จัดการ dependencies (ลบ  ออกแล้ว)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ ./src/
+# 2. Copy ไฟล์ทั้งหมดเข้าเครื่อง
+COPY . .
 
-# สร้างโฟลเดอร์เก็บข้อมูล
-RUN mkdir data
+# 3. ตั้งค่า PYTHONPATH ให้ชี้มาที่ /app เพื่อให้หา src เจอ
+ENV PYTHONPATH=/app
 
-# รัน Script เมื่อสั่ง start container
-CMD ["python", "src/main.py"]
+# 4. รันด้วยคำสั่ง -m (Module) เพื่อให้จัดการ Path ให้อัตโนมัติ
+CMD ["python", "-m", "src.main"]
