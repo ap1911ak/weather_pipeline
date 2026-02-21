@@ -1,6 +1,7 @@
 # 🌦️ Weather Data Pipeline
-Lightweight ETL pipeline สำหรับดึงข้อมูลพยากรณ์อากาศจาก **Open-Meteo API** → Transform → Persist เป็น CSV  
-ออกแบบในเชิง Data Engineering Best Practice เพื่อใช้เป็น template สำหรับ production-grade pipeline ขนาดเล็ก
+Production-ready lightweight Weather ETL Pipeline
+ออกแบบด้วยแนวคิด Layered Architecture + Separation of Concerns
+รองรับการต่อยอดไปสู่ Data Platform ขนาดใหญ่ได้
 
 ---
 
@@ -15,89 +16,93 @@ Pipeline นี้ทำหน้าที่:
   > Extract → Validate → Transform → Persist (Batch Mode)
 
 # 🏗️ 2. High-Level Architecture
-            ┌─────────────────────┐
-            │   Open-Meteo API    │
-            └─────────┬───────────┘
-                      │
-                (HTTP Request)
-                      │
-            ┌─────────▼───────────┐
-            │   Extract Layer     │
-            │  fetch_weather()    │
-            └─────────┬───────────┘
-                      │
-            ┌─────────▼───────────┐
-            │  Transform Layer    │
-            │ clean_weather_data()│
-            └─────────┬───────────┘
-                      │
-            ┌─────────▼───────────┐
-            │     Load Layer      │
-            │  CSV Persistence    │
-            └─────────────────────┘
+                ┌─────────────────────┐
+                │   Open-Meteo API    │
+                └─────────┬───────────┘
+                          │
+                   clients.weather_api
+                          │
+                ┌─────────▼───────────┐
+                │  services layer     │
+                │  weather_service    │
+                └─────────┬───────────┘
+                          │
+                  transform.py (pure)
+                          │
+                ┌─────────▼───────────┐
+                │ repositories layer  │
+                │ weather_storage     │
+                └─────────────────────┘
+
 
 
 # 🧱 3. Project Structure
-    weather_pipeline-dev/
+
+     weather_pipeline/
     │
     ├── src/
-    │ ├── main.py # Orchestration entry point
-    │ └── transform.py # Pure transformation logic
+    │   ├── main.py
+    │   ├── transform.py
+    │   │
+    │   ├── clients/
+    │   │   └── weather_api.py
+    │   │
+    │   ├── services/
+    │   │   └── weather_service.py
+    │   │
+    │   ├── repositories/
+    │   │   └── weather_storage.py
+    │   │
+    │   └── config/
+    │       └── settings.py
     │
     ├── tests/
-    │ └── test_transform.py
+    │   └── test_transform.py
     │
     ├── Dockerfile
     ├── requirements.txt
-    └── pytest.ini
+    ├── pytest.ini
+    └── .github/workflows/ci.yml
 
 # ⚙️ 4. Design Principles
-## 4.1 Separation of Concerns
-    | Layer     | Responsibility                  |
-    |------------|--------------------------------|
-    | Extract    | External API communication     |
-    | Transform  | Pure data logic                |
-    | Load       | Persistence                    |
-    | Test       | Deterministic validation       |
+## Separation of Concerns
 
-`transform.py` ไม่มี side-effect → ทำให้ test ได้ง่าย
+    | Layer        | Responsibility                      |
+    | ------------ | ----------------------------------- |
+    | clients      | External API communication          |
+    | services     | Business logic orchestration        |
+    | transform    | Pure deterministic transformation   |
+    | repositories | Persistence logic                   |
+    | config       | Environment & runtime configuration |
+    | main         | Entry point                         |
 
----
+#🚀 5. Execution
+##▶️ Run Locally
 
-## 4.2 Deterministic Transformation
-
-```python
-df['is_hot'] = df['temperature_2m'] > 30
-```
-## 4.3 Idempotency
-Pipeline สามารถ rerun ได้โดย:
-  - Overwrite file output
-  - ไม่มี hidden state
-  - ไม่มี dependency ภายนอกนอกจาก API
-
-#🚀 5. Executio
-## Dockerized Execution
+    pip install -r requirements.txt
+    python -m src.main
+  
+##🐳 Docker Execution
 
     docker build -t weather-pipeline .
     docker run --rm weather-pipeline
     
 #📊 6. Data Model
 
-    | Column         | Type     | Description          |
-    | -------------- | -------- | -------------------- |
-    | time           | datetime | Observation time     |
-    | temperature_2m | float    | Air temperature (°C) |
-    | is_hot         | boolean  | temperature > 30     |
-
+    | Column         | Type     | Description           |
+    | -------------- | -------- | --------------------- |
+    | time           | datetime | Observation timestamp |
+    | temperature_2m | float    | Air temperature (°C)  |
+    | is_hot         | boolean  | temperature > 30      |
 
 #🔍 7. Engineering Trade-offs
 
-    | Decision         | Rationale                 |
-    | ---------------- | ------------------------- |
-    | CSV storage      | Simplicity for demo       |
-    | Pandas           | Small dataset             |
-    | Batch mode       | Simpler operational model |
-    | No orchestration | Keep lightweight          |
+    | Decision              | Rationale                    |
+    | --------------------- | ---------------------------- |
+    | CSV storage           | Lightweight demo persistence |
+    | Pandas                | Dataset ขนาดเล็ก              |
+    | Batch Mode            | Operational simplicity       |
+    | No orchestration tool | Keep system minimal          |
 
 #📈 8. Scalability Path
 
@@ -117,14 +122,17 @@ Pipeline สามารถ rerun ได้โดย:
   - Prometheus
   - Grafana
 
-🔐 Add Retry & Circuit Breaker
+##🔐 Reliability Improvements
+  - Retry with exponential backoff
+  - Timeout control
+  - Schema validation (Pandera / Pydantic)
+  - Dead-letter storage
+  - Alerting integration
 
-#🛡️ 9. Reliability Considerations 
-
-  Production-ready version ควรเพิ่ม:
-  Structured logging
-  Retry with exponential backoff
-  Timeout handling
-  Schema validation (Pandera)  
-  Dead-letter storage
-  Alerting mechanism
+#🛡️ 9. Production Hardening Checklist
+ - Structured logging
+ - Centralized config management
+ - Environment-based config (.env supported)
+ - Observability metrics
+ - Container security scan
+ - CI/CD enforcement
