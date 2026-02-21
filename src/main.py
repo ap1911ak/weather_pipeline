@@ -1,22 +1,23 @@
-import requests
-import os
-from transform import clean_weather_data
+from src.clients.weather_api import WeatherClient
+from src.services.weather_service import WeatherService
+from src.repositories.weather_storage import WeatherRepository
 
-def fetch_weather():
-    # API ของ Open-Meteo ดึงพยากรณ์อากาศของกรุงเทพฯ
-    url = "https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&hourly=temperature_2m"
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.json()
+def run_pipeline():
+    # Initialize components
+    client = WeatherClient()
+    service = WeatherService()
+    repo = WeatherRepository()
+
+    print("Step 1: Fetching data from API...")
+    raw_data = client.fetch_raw_weather()
+
+    print("Step 2: Transforming data...")
+    transformed_df = service.transform_data(raw_data)
+
+    print("Step 3: Saving data...")
+    repo.save_to_csv(transformed_df)
+
+    print("Pipeline finished!")
 
 if __name__ == "__main__":
-    print("Fetching data...")
-    data = fetch_weather()
-    
-    print("Transforming data...")
-    df = clean_weather_data(data)
-    
-    # บันทึกลงโฟลเดอร์ data/
-    os.makedirs('data', exist_ok=True)
-    df.to_csv('data/weather_report.csv', index=False)
-    print("Pipeline finished! Saved to data/weather_report.csv")
+    run_pipeline()
